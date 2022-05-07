@@ -26,11 +26,15 @@ func main() {
 			wg.Done()
 		}(id, wg, m, cacheCh)
 		go func(id int, wg *sync.WaitGroup, m *sync.RWMutex, ch chan<- Book) {
-			if b, ok := queryDatabase(id, m); ok {
+			if b, ok := queryDatabase(id); ok {
+				m.Lock()
+				cache[id] = b
+				m.Unlock()
 				ch <- b
 			}
 			wg.Done()
 		}(id, wg, m, dbCh)
+
 		go func(cacheCh, dbCh <-chan Book) {
 			select {
 			case b := <-cacheCh:
@@ -54,15 +58,13 @@ func queryCache(id int, m *sync.RWMutex) (Book, bool) {
 	return b, ok
 }
 
-func queryDatabase(id int, m *sync.RWMutex) (Book, bool) {
+func queryDatabase(id int) (Book, bool) {
 	time.Sleep(100 * time.Millisecond)
 	for _, b := range books {
 		if b.ID == id {
-			m.Lock()
-			cache[id] = b
-			m.Unlock()
 			return b, true
 		}
 	}
+
 	return Book{}, false
 }
